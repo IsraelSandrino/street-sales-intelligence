@@ -65,22 +65,24 @@ export async function searchLeads(term: string, limit = 12): Promise<Lead[]> {
   const supabase = getSupabaseClient()
   const normalizedTerm = term.trim()
 
+  if (normalizedTerm.length === 0) {
+    return []
+  }
+
   let query = supabase
     .from('leads')
     .select(buildLeadSelect())
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (normalizedTerm.length > 0) {
-    const digits = normalizePhone(normalizedTerm)
-    const clauses = [`name.ilike.%${normalizedTerm}%`]
+  const digits = normalizePhone(normalizedTerm)
+  const clauses = [`name.ilike.%${normalizedTerm}%`]
 
-    if (digits.length > 0) {
-      clauses.push(`phone.ilike.%${digits}%`)
-    }
-
-    query = query.or(clauses.join(','))
+  if (digits.length > 0) {
+    clauses.push(`phone.ilike.%${digits}%`)
   }
+
+  query = query.or(clauses.join(','))
 
   const response = await query
   const { data, error } = response as {

@@ -15,10 +15,6 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
-function normalizeQuery(value: string) {
-  return value.trim()
-}
-
 function normalizeSearch(value: string) {
   return value
     .normalize('NFD')
@@ -76,7 +72,15 @@ export function SaleForm({ onSaved }: SaleFormProps) {
 
   useEffect(() => {
     let active = true
-    const term = normalizeQuery(leadQuery)
+    const term = leadQuery.trim()
+
+    if (term.length === 0) {
+      setLeadResults([])
+      setLoadingLeads(false)
+      return () => {
+        active = false
+      }
+    }
 
     const timeout = window.setTimeout(async () => {
       setLoadingLeads(true)
@@ -155,6 +159,17 @@ export function SaleForm({ onSaved }: SaleFormProps) {
 
   function addProduct(productId: string) {
     setItemQuantity(productId, (quantities[productId] ?? 0) + 1)
+  }
+
+  function handleProductSelect(productId: string) {
+    addProduct(productId)
+    setProductQuery('')
+  }
+
+  function handleLeadSelect(lead: Lead) {
+    setSelectedLead(lead)
+    setLeadQuery('')
+    setLeadResults([])
   }
 
   function clearDraft() {
@@ -236,31 +251,30 @@ export function SaleForm({ onSaved }: SaleFormProps) {
         />
       </label>
 
-      <div className="results-stack">
-        {loadingLeads ? <p className="helper-text">Buscando leads...</p> : null}
-        {!loadingLeads && leadResults.length === 0 ? (
-          <p className="helper-text">Nenhum lead encontrado. Tente outro nome ou telefone.</p>
-        ) : null}
+      {leadQuery.trim() ? (
+        <div className="results-stack">
+          {loadingLeads ? <p className="helper-text">Buscando leads...</p> : null}
+          {!loadingLeads && leadResults.length === 0 ? (
+            <p className="helper-text">Nenhum lead encontrado. Tente outro nome ou telefone.</p>
+          ) : null}
 
-        {leadResults.map((lead) => {
-          const isSelected = selectedLead?.id === lead.id
+          {leadResults.map((lead) => {
+            const isSelected = selectedLead?.id === lead.id
 
-          return (
-            <button
-              key={lead.id}
-              type="button"
-            className={`result-card ${isSelected ? 'selected' : ''}`}
-            onClick={() => {
-              setSelectedLead(lead)
-              setLeadQuery(lead.name)
-            }}
-          >
-              <strong>{lead.name}</strong>
-              <span>{formatPhone(lead.phone)}</span>
-            </button>
-          )
-        })}
-      </div>
+            return (
+              <button
+                key={lead.id}
+                type="button"
+                className={`result-card ${isSelected ? 'selected' : ''}`}
+                onClick={() => handleLeadSelect(lead)}
+              >
+                <strong>{lead.name}</strong>
+                <span>{formatPhone(lead.phone)}</span>
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
 
       {selectedLead ? (
         <section className="selected-lead">
@@ -314,7 +328,7 @@ export function SaleForm({ onSaved }: SaleFormProps) {
                     key={product.id}
                     type="button"
                     className={`result-card product-result ${isSelected ? 'selected' : ''}`}
-                    onClick={() => addProduct(product.id)}
+                    onClick={() => handleProductSelect(product.id)}
                   >
                     <div className="product-info">
                       <div>
