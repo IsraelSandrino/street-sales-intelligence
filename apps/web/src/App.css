@@ -274,6 +274,11 @@
   gap: 12px;
 }
 
+.selected-products-stack {
+  display: grid;
+  gap: 12px;
+}
+
 .result-card,
 .selected-lead,
 .product-card,
@@ -289,6 +294,20 @@
   display: grid;
   gap: 4px;
   text-align: left;
+}
+
+.product-result {
+  gap: 8px;
+}
+
+.product-result .product-info {
+  align-items: center;
+}
+
+.result-meta {
+  font-size: 0.84rem;
+  color: #0f766e;
+  font-weight: 700;
 }
 
 .result-card.selected,
@@ -375,6 +394,13 @@
 
 .subtotal-line {
   margin: 0;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
 }
 
 .total-banner {

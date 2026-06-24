@@ -19,11 +19,20 @@ function normalizeQuery(value: string) {
   return value.trim()
 }
 
+function normalizeSearch(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
 export function SaleForm({ onSaved }: SaleFormProps) {
   const [leadQuery, setLeadQuery] = useState('')
   const [leadResults, setLeadResults] = useState<Lead[]>([])
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [products, setProducts] = useState<Product[]>([])
+  const [productQuery, setProductQuery] = useState('')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [loadingLeads, setLoadingLeads] = useState(true)
@@ -118,6 +127,21 @@ export function SaleForm({ onSaved }: SaleFormProps) {
       .filter((item): item is { product: Product; quantity: number; subtotal: number } => item !== null)
   }, [products, quantities])
 
+  const filteredProducts = useMemo(() => {
+    const term = normalizeSearch(productQuery)
+
+    if (!term) {
+      return []
+    }
+
+    return products.filter((product) => {
+      const name = normalizeSearch(product.name)
+      return name.includes(term)
+    })
+  }, [productQuery, products])
+
+  const selectedProductIds = useMemo(() => new Set(selectedItems.map((item) => item.product.id)), [selectedItems])
+
   const totalAmount = useMemo(() => {
     return selectedItems.reduce((sum, item) => sum + item.subtotal, 0)
   }, [selectedItems])
@@ -129,10 +153,15 @@ export function SaleForm({ onSaved }: SaleFormProps) {
     }))
   }
 
+  function addProduct(productId: string) {
+    setItemQuantity(productId, (quantities[productId] ?? 0) + 1)
+  }
+
   function clearDraft() {
     setLeadQuery('')
     setLeadResults([])
     setSelectedLead(null)
+    setProductQuery('')
     setQuantities({})
   }
 
@@ -261,46 +290,102 @@ export function SaleForm({ onSaved }: SaleFormProps) {
           <p className="helper-text">Nenhum produto ativo cadastrado.</p>
         ) : null}
 
-        <div className="product-grid">
-          {products.map((product) => {
-            const quantity = quantities[product.id] ?? 0
+        <label className="field">
+          <span>Buscar produto</span>
+          <input
+            autoComplete="off"
+            placeholder="Digite o nome do produto"
+            value={productQuery}
+            onChange={(event) => setProductQuery(event.target.value)}
+          />
+        </label>
 
-            return (
-              <article key={product.id} className={`product-card ${quantity > 0 ? 'selected' : ''}`}>
-                <div className="product-info">
-                  <div>
-                    <strong>{product.name}</strong>
-                    <span>{product.category}</span>
+        {productQuery.trim() ? (
+          <div className="results-stack">
+            {filteredProducts.length === 0 ? (
+              <p className="helper-text">Nenhum produto encontrado. Tente outro nome.</p>
+            ) : (
+              filteredProducts.map((product) => {
+                const quantity = quantities[product.id] ?? 0
+                const isSelected = selectedProductIds.has(product.id)
+
+                return (
+                  <button
+                    key={product.id}
+                    type="button"
+                    className={`result-card product-result ${isSelected ? 'selected' : ''}`}
+                    onClick={() => addProduct(product.id)}
+                  >
+                    <div className="product-info">
+                      <div>
+                        <strong>{product.name}</strong>
+                        <span>{product.category}</span>
+                      </div>
+                      <b>{formatCurrency(Number(product.price))}</b>
+                    </div>
+                    <span className="result-meta">
+                      {quantity > 0 ? `Selecionado ${quantity}x` : 'Toque para adicionar'}
+                    </span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        ) : (
+          <p className="helper-text">Digite parte do nome para encontrar o produto mais rápido.</p>
+        )}
+
+        {selectedItems.length > 0 ? (
+          <div className="selected-products-stack">
+            <div className="section-row">
+              <h3>Produtos selecionados</h3>
+              <span className="helper-text">{selectedItems.length} item(ns)</span>
+            </div>
+
+            <div className="product-grid">
+              {selectedItems.map(({ product, quantity, subtotal }) => (
+                <article key={product.id} className="product-card selected">
+                  <div className="product-info">
+                    <div>
+                      <strong>{product.name}</strong>
+                      <span>{product.category}</span>
+                    </div>
+                    <b>{formatCurrency(Number(product.price))}</b>
                   </div>
-                  <b>{formatCurrency(Number(product.price))}</b>
-                </div>
 
-                <div className="quantity-controls">
-                  <button
-                    type="button"
-                    className="quantity-button"
-                    onClick={() => setItemQuantity(product.id, quantity - 1)}
-                    disabled={quantity === 0}
-                  >
-                    -
-                  </button>
-                  <span className="quantity-value">{quantity}</span>
-                  <button
-                    type="button"
-                    className="quantity-button"
-                    onClick={() => setItemQuantity(product.id, quantity + 1)}
-                  >
-                    +
-                  </button>
-                </div>
+                  <div className="quantity-controls">
+                    <button
+                      type="button"
+                      className="quantity-button"
+                      onClick={() => setItemQuantity(product.id, quantity - 1)}
+                    >
+                      -
+                    </button>
+                    <span className="quantity-value">{quantity}</span>
+                    <button
+                      type="button"
+                      className="quantity-button"
+                      onClick={() => setItemQuantity(product.id, quantity + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
 
-                {quantity > 0 ? (
-                  <p className="subtotal-line">Subtotal: {formatCurrency(quantity * Number(product.price))}</p>
-                ) : null}
-              </article>
-            )
-          })}
-        </div>
+                  <div className="card-footer">
+                    <p className="subtotal-line">Subtotal: {formatCurrency(subtotal)}</p>
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() => setItemQuantity(product.id, 0)}
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="total-banner">
